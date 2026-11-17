@@ -3,7 +3,8 @@
 
 Usage:  python3 build.py            -> gta6_short_darija.mp4
 
-Voice : Piper neural TTS (male Arabic voice "kareem"), Darija script.
+Voice : your own recording in ./voice/seg0..seg5.(wav|mp3|m4a) if present (see SCRIPT_DARIJA.md),
+        otherwise Piper neural TTS (male Arabic voice "kareem") reading the Darija script.
 Music : synthwave/trap beat + SFX generated in numpy (no third-party audio).
 Video : original GTA-inspired neon visuals rendered with Pillow.
 
@@ -37,25 +38,25 @@ PINK, CYAN, YEL, WHITE, RED = (255, 45, 149), (45, 226, 255), (255, 210, 63), (2
 # sub: on-screen subtitle for each chunk (same number of chunks)
 SEGS = [
     dict(scene="hook",
-         tts="وقفو! وقفو!|اللعبة لي تسنيناها سنين...|وصلات أخيراً!",
-         sub="وقفو! وقفو!|اللعبة لي تسنيناها سنين|وصلات أخيراً!"),
+         tts="سْمْعُو مزيان آ الخوت!|اللعبة لي بْقِينَا كَنْتْسَنَّاوْهَا سنين...|ها هي وْصْلَاتْ!",
+         sub="سمعو مزيان آ الخوت!|اللعبة لي بقينا كنتسناوها سنين|ها هي وصلات!"),
     dict(scene="date",
-         tts="جي تي إي سيكس|غادي تخرج نهار الخميس،|تسعطاش نونبر!",
-         sub="GTA 6|غادي تخرج نهار الخميس|19 نونبر!"),
+         tts="صافي، جي تي إي سيكس خارجة|نهار الخميس،|تسعطاش نونبر!",
+         sub="صافي، GTA 6 خارجة|نهار الخميس|19 نونبر!"),
     dict(scene="city",
-         tts="رجعنا لفايس سيتي!|الليل، الضو،|الطوموبيلات الزربة،|والبحر!",
-         sub="رجعنا لـ Vice City!|الليل، الضو|الطوموبيلات الزربة|والبحر!"),
+         tts="غادي نْرْجْعُو لفايس سيتي!|الليل، الضو، البحر،|والطوموبيلات كَيْطِيرُو!|حاجة خطيرة!",
+         sub="غادي نرجعو لـ Vice City!|الليل، الضو، البحر|والطوموبيلات كيطيرو!|حاجة خطيرة!"),
     dict(scene="heroes",
-         tts="جوج ديال الأبطال،|جيسون و لوسيا،|و قصة غادي تشدكم|من اللول حتى للخر!",
-         sub="جوج ديال الأبطال|جيسون و لوسيا|قصة غادي تشدكم|من اللول حتى للخر!"),
+         tts="جوج ديال الأبطال،|جيسون و لوسيا،|و واحد القصة غادي تْشْدّْكُم|من اللول حتى للخر!",
+         sub="جوج ديال الأبطال|جيسون و لوسيا|و واحد القصة غادي تشدكم|من اللول حتى للخر!"),
     dict(scene="live",
-         tts="و نهار الخروج،|غادي نديرو لايف مباشر هنا فالقناة،|و نلعبو مع بعض|من الدقيقة الأولى!",
-         sub="نهار الخروج|لايف مباشر هنا فالقناة|نلعبو مع بعض|من الدقيقة الأولى!"),
+         tts="و نهار الخروج،|عندنا لايف هنا فالقناة،|غادي نْلْعْبُو مع بعضياتنا|من الدقيقة اللولة!",
+         sub="و نهار الخروج|عندنا لايف هنا فالقناة|غادي نلعبو مع بعضياتنا|من الدقيقة اللولة!"),
     dict(scene="cta",
-         tts="ما تنساوش!|اشتركو فالقناة،|و كليكيو على الجرس|باش يوصلكم الإشعار.|نتلاقاو فاللايف، يلاه!",
-         sub="ما تنساوش!|اشتركو فالقناة|كليكيو على الجرس|باش يوصلكم الإشعار|نتلاقاو فاللايف، يلاه!"),
+         tts="ما تنساوش!|دِيرُو أبوني فالقناة،|و كليكيو على الجرس|باش تْوْصْلْكُم النوتيفيكاسيون.|نتلاقاو فاللايف، يالاه!",
+         sub="ما تنساوش!|ديرو أبوني فالقناة|و كليكيو على الجرس|باش توصلكم النوتيفيكاسيون|نتلاقاو فاللايف، يالاه!"),
 ]
-INTRO, GAP, OUTRO = 0.55, 0.28, 1.4
+INTRO, GAP, OUTRO = 0.5, 0.22, 1.3
 
 
 def run(cmd, **kw):
@@ -93,9 +94,13 @@ def make_voice():
     vf = ("highpass=f=85,equalizer=f=180:t=q:w=1:g=2,equalizer=f=3200:t=q:w=1.2:g=4,"
           "acompressor=threshold=-22dB:ratio=4:attack=4:release=90:makeup=5dB")
     for i, s in enumerate(SEGS):
+        rec = [p for p in glob.glob(os.path.join(HERE, "voice", f"seg{i}.*"))]
+        if rec:                                   # real Moroccan recording wins over TTS
+            print(f"  using recorded voice {rec[0]}")
+            clips.append(trim(load_audio(rec[0], vf), 0.02)); continue
         text = " ".join(s["tts"].split("|"))
         wav = os.path.join(vdir, f"seg{i}.wav")
-        run([sys.executable, "-m", "piper", "-m", VOICE, "--length-scale", "0.78",
+        run([sys.executable, "-m", "piper", "-m", VOICE, "--length-scale", "0.74",
              "--noise-scale", "0.7", "--noise-w-scale", "0.9", "--sentence-silence", "0.12", "-f", wav],
             input=text.encode(), capture_output=True)
         a = trim(load_audio(wav, vf))
@@ -575,7 +580,7 @@ def render(fi):
             spr = text_sprite("GTA 6", 300, PINK, LAT, 12, 34, False, grad=((255, 230, 120), (255, 45, 149)))
             jit = 10 * math.exp(-(t - INTRO) * 4)
             place(fr, spr, W / 2 + jit * math.sin(t * 70), 640, INTRO, t, 2.2, 0.4)
-            place(fr, text_sprite("قريب بزاف", 70, CYAN, AR, 6, 14), W / 2, 880, INTRO + 0.5, t, 1.4)
+            place(fr, text_sprite("قربات بزاف", 70, CYAN, AR, 6, 14), W / 2, 880, INTRO + 0.5, t, 1.4)
     elif name == "date":
         place(fr, text_sprite("الخميس", 90, WHITE, AR, 7, 16), W / 2, 420, sc["a"], t)
         place(fr, text_sprite("19", 330, YEL, LAT, 12, 30, False, grad=((255, 240, 150), (255, 120, 60))), W / 2, 660, sc["a"] + 0.15, t, 1.8)
@@ -600,7 +605,7 @@ def render(fi):
             ImageDraw.Draw(box).rounded_rectangle([0, 0, box.width - 1, box.height - 1], 40, fill=RED + (235,))
             place(fr, box, W / 2, 560, sc["a"], t, 1.6)
             place(fr, b2, W / 2, 560, sc["a"], t, 1.6)
-        place(fr, text_sprite("لايف مباشر", 120, WHITE, AR, 8, 20), W / 2, 800, sc["a"] + 0.3, t)
+        place(fr, text_sprite("لايف فالقناة", 120, WHITE, AR, 8, 20), W / 2, 800, sc["a"] + 0.3, t)
         place(fr, text_sprite("نهار الخروج • 19 نونبر", 70, YEL, AR, 6, 14), W / 2, 960, sc["a"] + 0.5, t)
     elif name == "cta":
         st = G["sub_time"]
@@ -609,7 +614,7 @@ def render(fi):
         bw_, bh_ = 640, 170
         btn = Image.new("RGBA", (bw_ + 40, bh_ + 40), (0, 0, 0, 0)); bd = ImageDraw.Draw(btn)
         bd.rounded_rectangle([20, 20, 20 + bw_, 20 + bh_], 85, fill=(70, 70, 80, 255) if clicked else (230, 0, 35, 255))
-        lab = text_sprite("مشترك ✓" if clicked else "اشترك", 80, WHITE, AR, 0, 0)
+        lab = text_sprite("صافي ✓" if clicked else "دير أبوني", 80, WHITE, AR, 0, 0)
         btn.alpha_composite(lab, ((btn.width - lab.width) // 2, (btn.height - lab.height) // 2))
         press = 0.9 if st <= t < st + 0.12 else 1.0
         if press != 1.0:
@@ -635,7 +640,7 @@ def render(fi):
             if st <= t < st + 0.3:
                 rr = 30 + (t - st) * 400
                 cd.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], outline=(255, 255, 255), width=5)
-        place(fr, text_sprite("فعلو الإشعارات", 70, YEL, AR, 6, 14), W / 2, 930, sc["a"] + 0.7, t)
+        place(fr, text_sprite("كليكيو على الجرس", 70, YEL, AR, 6, 14), W / 2, 930, sc["a"] + 0.7, t)
 
     # ---- subtitles (synced to narration chunks)
     for s in G["segs"]:
