@@ -38,8 +38,8 @@ PINK, CYAN, YEL, WHITE, RED = (255, 45, 149), (45, 226, 255), (255, 210, 63), (2
 # sub: on-screen subtitle for each chunk (same number of chunks)
 SEGS = [
     dict(scene="hook",
-         tts="سْمْعُو مزيان آ الخوت!|اللعبة لي بْقِينَا كَنْتْسَنَّاوْهَا سنين...|ها هي وْصْلَاتْ!",
-         sub="سمعو مزيان آ الخوت!|اللعبة لي بقينا كنتسناوها سنين|ها هي وصلات!"),
+         tts="سْمْعُو مزيان الخوت!|اللعبة اللي بْقِينَا كَنْتْسَنَّاوْ سنين...|هِيَّا وْصْلَاتْ!",
+         sub="سمعوا مزيان الخوت!|اللعبة اللي بقينا كنتسناو سنين|هيا وصلات!"),
     dict(scene="date",
          tts="صافي، جي تي إي سيكس خارجة|نهار الخميس،|تسعطاش نونبر!",
          sub="صافي، GTA 6 خارجة|نهار الخميس|19 نونبر!"),
@@ -485,6 +485,17 @@ def text_sprite(txt, size, color, fontp=AR, stroke=10, glow_r=22, rtl=True, grad
     return out
 
 
+def sub_size(txt, size=76, max_w=W - 120):
+    """Largest subtitle font size (<= size) whose text fits inside the safe width."""
+    while size > 40:
+        bb = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox(
+            (0, 0), txt, font=font(AR, size), stroke_width=9, direction="rtl", language="ar")
+        if bb[2] - bb[0] <= max_w:
+            return size
+        size -= 2
+    return size
+
+
 def ease_out_back(x):
     c1 = 1.70158; c3 = c1 + 1
     return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2
@@ -672,11 +683,11 @@ def render(fi):
     for s in G["segs"]:
         for txt, a, b in s["chunks"]:
             if a <= t < b + 0.05:
-                spr = text_sprite(txt, 76, WHITE, AR, 9, 0)
+                spr = text_sprite(txt, sub_size(txt), WHITE, AR, 9, 0)
                 pill = Image.new("RGBA", (spr.width + 20, spr.height - 10), (0, 0, 0, 0))
                 ImageDraw.Draw(pill).rounded_rectangle([0, 0, pill.width - 1, pill.height - 1], 36, fill=(0, 0, 0, 140))
                 place(fr, pill, W / 2, 1340, a, t, 1.12, 0.12)
-                hl = text_sprite(txt, 76, YEL if (s["chunks"].index((txt, a, b)) % 2) else WHITE, AR, 9, 0)
+                hl = text_sprite(txt, sub_size(txt), YEL if (s["chunks"].index((txt, a, b)) % 2) else WHITE, AR, 9, 0)
                 place(fr, hl, W / 2, 1340, a, t, 1.25, 0.15)
 
     # ---- global overlays
