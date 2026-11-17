@@ -87,6 +87,30 @@ def trim(a, thr=0.01):
     return a[max(0, idx[0] - int(0.03 * SR)): idx[-1] + int(0.08 * SR)]
 
 
+# phone / WhatsApp recordings: denoise, remove rumble, tame harshness, even out volume
+REC_FILTER = ("highpass=f=80,lowpass=f=12000,afftdn=nf=-25:nr=12,"
+              "equalizer=f=250:t=q:w=1:g=-2,equalizer=f=3500:t=q:w=1.2:g=3,equalizer=f=7000:t=q:w=2:g=-2,"
+              "acompressor=threshold=-24dB:ratio=3.5:attack=5:release=120:makeup=6dB,"
+              "loudnorm=I=-16:TP=-2:LRA=7")
+MAX_LEN = 45.0
+
+
+def fit_length(clips):
+    """If narration is too long for a 45 s Short, speed it up (pitch preserved, max x1.15)."""
+    need = INTRO + OUTRO + GAP * (len(clips) - 1) + sum(len(c) for c in clips) / SR
+    if need <= MAX_LEN - 0.2:
+        return clips
+    voice_len = sum(len(c) for c in clips) / SR
+    tempo = min(1.15, voice_len / (MAX_LEN - 0.3 - INTRO - OUTRO - GAP * (len(clips) - 1)))
+    print(f"  narration {need:.1f}s > {MAX_LEN}s -> speeding up x{tempo:.3f}")
+    out = []
+    for c in clips:
+        r = run(["ffmpeg", "-v", "error", "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", "-",
+                 "-af", f"atempo={tempo:.4f}", "-f", "f32le", "-"], input=c.tobytes(), capture_output=True)
+        out.append(np.frombuffer(r.stdout, np.float32).copy())
+    return out
+
+
 def make_voice():
     ensure_voice()
     vdir = os.path.join(CACHE, "voice"); os.makedirs(vdir, exist_ok=True)
@@ -94,10 +118,12 @@ def make_voice():
     vf = ("highpass=f=85,equalizer=f=180:t=q:w=1:g=2,equalizer=f=3200:t=q:w=1.2:g=4,"
           "acompressor=threshold=-22dB:ratio=4:attack=4:release=90:makeup=5dB")
     for i, s in enumerate(SEGS):
-        rec = [p for p in glob.glob(os.path.join(HERE, "voice", f"seg{i}.*"))]
+        rec = sorted(p for p in glob.glob(os.path.join(HERE, "voice", f"seg{i}.*")) if not p.endswith(".gitkeep"))
         if rec:                                   # real Moroccan recording wins over TTS
             print(f"  using recorded voice {rec[0]}")
-            clips.append(trim(load_audio(rec[0], vf), 0.02)); continue
+            a = load_audio(rec[0], REC_FILTER)
+            a = trim(a, 0.08 * np.abs(a).max())
+            clips.append(a); continue
         text = " ".join(s["tts"].split("|"))
         wav = os.path.join(vdir, f"seg{i}.wav")
         run([sys.executable, "-m", "piper", "-m", VOICE, "--length-scale", "0.74",
@@ -680,7 +706,7 @@ def render(fi):
 def main():
     os.makedirs(CACHE, exist_ok=True)
     print("1/4 voice (Darija TTS) ...")
-    vclips = make_voice()
+    vclips = fit_length(make_voice())
     segs, scenes, total = build_timeline(vclips)
     cta = segs[-1]
     sub_time = cta["chunks"][1][1] + 0.35            # click "subscribe" while it is said
